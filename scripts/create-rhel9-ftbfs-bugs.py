@@ -21,16 +21,14 @@ LOGGER = logging.getLogger(os.path.basename(__file__))
 DRY_RUN = None
 
 config = {
-    "eln_tracking_bug": "ELNFTBFS",
-    "product": "Fedora",
-    "version": "ELN",
+    "rhel_tracking_bug": "RHEL9FTBFS",
+    "product": "rhel",
+    "version": "9.0",
     "rhel_product": "Red Hat Enterprise Linux 9",
     "rhel_version": "9",
-    "external_eln_ftbfs_url": "https://docs.fedoraproject.org/en-US/eln/",
-    "internal_eln_ftbfs_url": None,
     "mirror_bugs": True,
-    "kojihub": "https://koji.fedoraproject.org/kojihub",
-    "koji_build_releasefilter": "eln",
+    "kojihub": "https://brewweb.engineering.redhat.com/kojihub",
+    "koji_build_releasefilter": "el9",
     "koji_build_epoch": "2020-01-01 00:00:00",
 }
 
@@ -85,33 +83,14 @@ def get_comps_subcomp(bz, config):
     return comps_dict
 
 
-DEFAULT_SUMMARY = "[ELN] {component}: FTBFS in {product} {version}"
+DEFAULT_SUMMARY = "[RHEL9] {component}: FTBFS in {product}-{version}"
 
-DEFAULT_COMMENT = """{component} failed to build from source in {product} {version}
+DEFAULT_COMMENT = """{component} failed to build from source in {product}-{version}
 
-https://koji.fedoraproject.org/koji/taskinfo?taskID={task_id}
-{extrainfo}
+https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=={task_id}
 
-For resources to help remediate ELN build issues see:
-
-{external_eln_ftbfs_url}
-
-Please fix {component} in the Rawhide branch at your earliest convenience and
+Please fix {component} in at your earliest convenience and
 set the bug's status to ASSIGNED when you start fixing it.
-"""
-
-DEFAULT_EXTRAINFO = """
-Note that {component} also appears to be failing to build from source in Fedora Rawhide.
-Be sure to address that issue first. See BZ#{bugid}.
-"""
-
-DEFAULT_PRIV_COMMENT = """
-Packages that are important to RHEL {rhel_version} need to build successfully
-and correctly for Fedora ELN.
-
-For additional internal resources to help remediate ELN build issues see:
-
-{internal_eln_ftbfs_url}
 """
 
 
@@ -124,8 +103,6 @@ def report_failure(
     logs,
     summary=DEFAULT_SUMMARY,
     comment=DEFAULT_COMMENT,
-    extrainfo="",
-    priv_comment="",
 ):
     """This function files a new bugzilla bug for component with given
     arguments
@@ -140,18 +117,14 @@ def report_failure(
     logs -- list of URLs to the log file to attach to the bug report
     summary -- short bug summary (if not default)
     comment -- first public comment describing the bug in more detail (if not default)
-    extrainfo -- optional additional information to include in first public comment
-    priv_comment -- optional private comment to add to bug report
     """
 
     format_values = dict(**config)
     format_values["task_id"] = task_id
     format_values["component"] = component
-    format_values["extrainfo"] = extrainfo
 
     summary = summary.format(**format_values)
     comment = comment.format(**format_values)
-    priv_comment = priv_comment.format(**format_values)
 
     data = {
         "product": config["rhel_product"],
@@ -159,7 +132,7 @@ def report_failure(
         "version": "unspecified",
         "short_desc": summary,
         "comment": comment,
-        "blocks": config["eln_tracking_bug"],
+        "blocks": config["rhel_tracking_bug"],
         "rep_platform": "Unspecified",
         "bug_severity": "unspecified",
         "op_sys": "Unspecified",
@@ -173,13 +146,7 @@ def report_failure(
             {"name": "mirror", "status": "+"},
         ]
 
-    if priv_comment:
-        priv_update = bz.build_update(comment=priv_comment, comment_private=True)
-    else:
-        priv_update = None
-
     LOGGER.debug("Bug creation data: {}".format(data))
-    LOGGER.debug("Private comment data: {}".format(priv_update))
 
     if DRY_RUN:
         print("DRY_RUN: NOT creating the bug report")
@@ -190,8 +157,6 @@ def report_failure(
         bug = bz.createbug(**data)
         bug.refresh()
         print(bug)
-        if priv_update:
-            bz.update_bugs([bug.id], priv_update)
         attach_logs(bz, bug, logs)
     except Exception as ex:
         print(ex)
@@ -367,19 +332,6 @@ def listify(list_or_simple):
 @click.option(
     "--api-key", type=str, help="Bugzilla API key", show_default=True, default=None,
 )
-@click.option(
-    "--internal-eln-ftbfs-url",
-    type=str,
-    help="URL to an internal web page with resources for resolving ELN FTBFS errors",
-    show_default=True,
-    default=None,
-)
-@click.option(
-    "--rawhide-tracking-bug",
-    help="The current Rawhide FTBFS tracking bug",
-    show_default=True,
-    default="F34FTBFS",
-)
 def cli(
     debug,
     dry_run,
@@ -387,8 +339,6 @@ def cli(
     bugzilla_url,
     sslverify,
     api_key,
-    internal_eln_ftbfs_url,
-    rawhide_tracking_bug,
 ):
 
     global DRY_RUN
@@ -400,8 +350,6 @@ def cli(
         LOGGER.debug("Debugging mode enabled")
     else:
         logging.basicConfig()
-
-    config["internal_eln_ftbfs_url"] = internal_eln_ftbfs_url
 
     if DRY_RUN:
         LOGGER.warning("Running in DRY RUN mode!")
@@ -436,7 +384,7 @@ def cli(
     LOGGER.debug("Need to make sure bugs are filed for: {}".format(ftbfs_pkg_list))
 
     # get previously filed BZs
-    filed_bugs = get_filed_bugs(bz, config["eln_tracking_bug"])
+    filed_bugs = get_filed_bugs(bz, config["rhel_tracking_bug"])
     eln_filed_bugs_components = {
         comp: bug.id for bug in filed_bugs for comp in listify(bug.component)
     }
@@ -448,24 +396,6 @@ def cli(
     )
     LOGGER.debug(
         "Bugs have been previosly filed for: {}".format(eln_filed_bugs_components)
-    )
-
-    # get filed Rawhide BZs
-    filed_bugs = get_filed_bugs(bz, rawhide_tracking_bug)
-    rawhide_open_bugs_components = {
-        comp: bug.id
-        for bug in filed_bugs
-        if bug.status != "CLOSED"
-        for comp in listify(bug.component)
-    }
-
-    print(
-        "Rawhide bugs are still open for {} packages".format(
-            len(rawhide_open_bugs_components)
-        )
-    )
-    LOGGER.debug(
-        "Rawhide bugs are still open for: {}".format(rawhide_open_bugs_components)
     )
 
     # get map of all components
@@ -488,17 +418,6 @@ def cli(
 
         print("Need to create BZ for package {}".format(pkg))
 
-        if pkg in rawhide_open_bugs_components:
-            rawhide_bugid = rawhide_open_bugs_components[pkg]
-            print(
-                "Rawhide FTBFS BZ#{} is still open for package {}".format(
-                    rawhide_bugid, pkg
-                )
-            )
-            extrainfo = DEFAULT_EXTRAINFO.format(component=pkg, bugid=rawhide_bugid)
-        else:
-            extrainfo = ""
-
         task_id = get_koji_failed_build_taskid(
             ks, pkg, config["koji_build_releasefilter"], config["koji_build_epoch"]
         )
@@ -511,11 +430,6 @@ def cli(
 
         LOGGER.debug("Logs for task_id {}: {}".format(task_id, logs))
 
-        if internal_eln_ftbfs_url:
-            priv_comment = DEFAULT_PRIV_COMMENT
-        else:
-            priv_comment = ""
-
         report_failure(
             bz,
             config,
@@ -523,8 +437,6 @@ def cli(
             comps_subcomp[pkg],
             task_id,
             logs,
-            extrainfo=extrainfo,
-            priv_comment=priv_comment,
         )
 
 
