@@ -1,0 +1,38 @@
+{
+  "re-trigger": false, 
+  "artifact": {
+    "release": "f35", 
+    "type": "koji-build-group", 
+    "builds": [
+      {
+	"nvr": "gdk-pixbuf2-2.42.2-1.fc35", 
+	"task_id": 62316027, 
+	"scratch": false, 
+	"component": "gdk-pixbuf2", 
+	"type": "koji-build", 
+	"id": 1712686, 
+	"issuer": "kalev"
+      }, 
+      {
+	"nvr": "gdk-pixbuf2-xlib-2.40.2-2.fc35", 
+	"task_id": 62312435, 
+	"scratch": false, 
+	"component": "gdk-pixbuf2-xlib", 
+	"type": "koji-build", 
+	"id": 1712663, 
+	"issuer": "kalev"
+      }
+    ], 
+    "repository": "https://bodhi.fedoraproject.org/updates/FEDORA-2021-36fb4782c9", 
+    "id": "FEDORA-2021-36fb4782c9-54dbcfdbbd6f26679e090cc57a987dc20041befd"
+  }, 
+  "contact": {
+    "docs": "https://docs.fedoraproject.org/en-US/ci/", 
+    "team": "Fedora CI", 
+    "email": "admin@fp.o", 
+    "name": "Bodhi"
+  }, 
+  "version": "0.2.2", 
+  "agent": "bodhi", 
+  "generated_at": "2021-02-19T21:52:39.450389Z"
+}
